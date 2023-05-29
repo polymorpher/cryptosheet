@@ -1,0 +1,14 @@
+[Unit]
+Description=Cryptosheet Services
+After=network.target
+
+[Service]
+Environment=PORT=80 HTTPS_PORT=443
+Type=simple
+User=worker
+WorkingDirectory=/opt/cryptosheet/server
+ExecStart=/opt/cryptosheet/server/node_modules/.bin/ts-node-esm /opt/cryptosheet/server/bin/run.ts
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
