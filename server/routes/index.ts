@@ -56,8 +56,8 @@ router.post('/basic',
     }
     console.log('[POST /basic]', { key, value })
     try {
-      const ret = await redisClient.set(key, value)
-      res.json({ updated: ret === 1 })
+      const response = await redisClient.set(key, value)
+      res.json({ response })
     } catch (ex: any) {
       console.error(ex)
       res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: ex.toString() })
