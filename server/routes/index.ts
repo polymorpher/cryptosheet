@@ -2,8 +2,13 @@ import { type NextFunction, type Request, type Response } from 'express'
 import express from 'express'
 import { StatusCodes } from 'http-status-codes'
 import rateLimit from 'express-rate-limit'
-import { redisClient } from '../src/redis.ts'
+import { redisClient, SUPPORTED_COMMANDS } from '../src/redis.ts'
 import config from '../config.ts'
+import axios from 'axios'
+import { VM } from 'vm2'
+import lodash from 'lodash-es'
+// import { ethers } from 'ethers'
+import crypto from 'crypto'
 
 const router = express.Router()
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -82,125 +87,6 @@ router.delete('/basic',
     }
   })
 
-const SUPPORTED_COMMANDS = [
-  'COPY',
-  'DEL',
-  'GET',
-  'SET',
-  'EXISTS',
-  'EXPIRE',
-  'MOVE',
-  'TOUCH',
-  'RENAME',
-
-  'HDEL',
-  'HEXISTS',
-  'HGET',
-  'HGETALL',
-  'HINCRBY',
-  'HINCRBYFLOAT',
-  'HKEYS',
-  'HLEN',
-  'HMGET',
-  'HMSET',
-  'HRANDFIELD',
-  'HSCAN',
-  'HSET',
-  'HSETNX',
-  'HSTRLEN',
-  'HVALS',
-
-  'SADD',
-  'SCARD',
-  'SDIFF',
-  'SDIFFSTORE',
-  'SINTER',
-  'SINTERCARD',
-  'SINTERSTORE',
-  'SISMEMBER',
-  'SMEMBERS',
-  'SMISMEMBER',
-  'SMOVE',
-  'SPOP',
-  'SRANDMEMBER',
-  'SREM',
-  'SSCAN',
-  'SUNION',
-  'SUNIONSTORE',
-
-  'ZADD',
-  'ZCARD',
-  'ZCOUNT',
-  'ZDIFF',
-  'ZDIFFSTORE',
-  'ZINCRBY',
-  'ZINTER',
-  'ZINTERCARD',
-  'ZINTERSTORE',
-  'ZLEXCOUNT',
-  'ZMPOP',
-  'ZMSCORE',
-  'ZPOPMAX',
-  'ZPOPMIN',
-  'ZRANDMEMBER',
-  'ZRANGE',
-  'ZRANGEBYLEX',
-  'ZRANGEBYSCORE',
-  'ZRANGESTORE',
-  'ZRANK',
-  'ZREM',
-  'ZREMRANGEBYLEX',
-  'ZREMRANGEBYRANK',
-  'ZREMRANGEBYSCORE',
-  'ZREVRANGE',
-  'ZREVRANGEBYLEX',
-  'ZREVRANGEBYSCORE',
-  'ZREVRANK',
-  'ZSCAN',
-  'ZSCORE',
-  'ZUNION',
-  'ZUNIONSTORE',
-
-  'PFADD',
-  'PFCOUNT',
-  'PFDEBUG',
-  'PFMERGE',
-  'PFSELFTEST',
-
-  'GEOADD',
-  'GEODIST',
-  'GEOHASH',
-  'GEOPOS',
-  'GEORADIUS',
-  'GEORADIUS_RO',
-  'GEORADIUSBYMEMBER',
-  'GEORADIUSBYMEMBER_RO',
-  'GEOSEARCH',
-  'GEOSEARCHSTORE',
-
-  'APPEND',
-  'DECR',
-  'DECRBY',
-  'GET',
-  'GETDEL',
-  'GETEX',
-  'GETRANGE',
-  'GETSET',
-  'INCR',
-  'INCRBY',
-  'INCRBYFLOAT',
-  'LCS',
-  'MGET',
-  'MSET',
-  'MSETNX',
-  'PSETEX',
-  'SET',
-  'SETEX',
-  'SETNX',
-  'SETRANGE',
-  'STRLEN',
-  'SUBSTR'
-]
 router.post('/cmd',
   limiter(),
   authed,
@@ -221,6 +107,102 @@ router.post('/cmd',
       }
       const response = await redisClient.sendCommand([cmd, ...args])
       res.json({ response })
+    } catch (ex: any) {
+      console.error(ex)
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: ex.toString() })
+    }
+  })
+
+const base = axios.create({ timeout: 10000 })
+router.get('/get',
+  limiter(),
+  authed,
+  async (req, res) => {
+    try {
+      const sepPos = req.originalUrl.indexOf('?')
+      const url = req.originalUrl.slice(sepPos + 1)
+      if (!url) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ error: 'need url as query string', url })
+      }
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ error: 'malformed url', url })
+      }
+      const { data, status, statusText } = await base.get(url, { validateStatus: () => true })
+      res.json({ data, status, statusText })
+    } catch (ex: any) {
+      console.error(ex)
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: ex.toString() })
+    }
+  })
+
+const SUPPORTED_METHODS = ['get', 'post', 'put', 'delete']
+router.post('/url',
+  limiter(),
+  authed,
+  async (req, res) => {
+    try {
+      let { url, method, body, headers } = req.body
+      if (!url) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ error: 'need url in body', url })
+      }
+      method = method?.toLowerCase()
+      if (!SUPPORTED_METHODS.includes(method)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ error: 'method not supported', method })
+      }
+      const { data, status, statusText } = await base({ url, method, data: body, headers, validateStatus: () => true })
+      res.json({ data, status, statusText })
+    } catch (ex: any) {
+      console.error(ex)
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: ex.toString() })
+    }
+  })
+
+async function runVMScript (script: string, useEthers: boolean = false, timeout: number = 5000): Promise<any> {
+  let ethers = {}
+  if (useEthers) {
+    const { default: e } = await import('ethers')
+    ethers = e.ethers
+  }
+  const vm = new VM({
+    timeout,
+    allowAsync: false,
+    sandbox: { crypto, lodash, ethers }
+  })
+  return vm.run(script)
+}
+router.get('/eval',
+  limiter(),
+  authed,
+  async (req, res) => {
+    try {
+      const sepPos = req.originalUrl.indexOf('?')
+      const script = req.originalUrl.slice(sepPos + 1)
+      if (!script) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ error: 'no script provided', script })
+      }
+      const result = await runVMScript(script)
+      res.json({ result })
+    } catch (ex: any) {
+      console.error(ex)
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: ex.toString(), query: req.query })
+    }
+  })
+
+router.post('/eval',
+  limiter(),
+  authed,
+  async (req, res) => {
+    try {
+      const { script, useEthers, timeout } = req.body
+      if (!script) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ error: 'no script provided', script })
+      }
+      const timeoutParsed = Number(timeout)
+      if (!(timeoutParsed < 5000)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ error: 'timeout has to be less than 5000ms', timeout: timeoutParsed })
+      }
+      const result = await runVMScript(script, !!useEthers, timeoutParsed)
+      res.json({ result })
     } catch (ex: any) {
       console.error(ex)
       res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: ex.toString() })
