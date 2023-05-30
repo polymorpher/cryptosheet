@@ -11,7 +11,7 @@ const config = {
     key: DEBUG ? './certs/test.key' : './certs/privkey.pem',
     cert: DEBUG ? './certs/test.cert' : './certs/fullchain.pem'
   },
-  secret: process.env.SECRET || '',
+  secret: process.env.SECRET ?? '',
   corsOrigins: process.env.CORS ?? '',
   // redis[s]://[[username][:password]@][host][:port][/db-number]
   redis: { url: process.env.REDIS_URL }
