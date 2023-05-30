@@ -1,5 +1,6 @@
 import { createClient } from 'redis'
 import config from '../config.ts'
+export { commandOptions } from 'redis'
 
 export let redisClient
 

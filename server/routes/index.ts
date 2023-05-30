@@ -2,13 +2,14 @@ import { type NextFunction, type Request, type Response } from 'express'
 import express from 'express'
 import { StatusCodes } from 'http-status-codes'
 import rateLimit from 'express-rate-limit'
-import { redisClient, SUPPORTED_COMMANDS } from '../src/redis.ts'
+import { redisClient, SUPPORTED_COMMANDS, commandOptions } from '../src/redis.ts'
 import config from '../config.ts'
 import axios from 'axios'
 import { VM } from 'vm2'
 import lodash from 'lodash-es'
 // import { ethers } from 'ethers'
 import crypto from 'crypto'
+import multer, { Multer } from 'multer'
 
 const router = express.Router()
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -37,12 +38,20 @@ router.get('/basic',
   limiter(),
   authed,
   async (req, res) => {
-    const { key } = req.query
+    const key = req.query.key as string | undefined
     if (!key) {
       return res.status(StatusCodes.BAD_REQUEST).json({ error: 'need key in query', key })
     }
     console.log('[GET /basic]', { key })
     try {
+      if (key.endsWith(':file')) {
+        const mimetype = await redisClient.get(`${key}:mimetype`)
+        if (!mimetype) {
+          return res.status(StatusCodes.BAD_REQUEST).json({ error: 'key does not exist', key })
+        }
+        const value = await redisClient.get(commandOptions({ returnBuffers: true }), key)
+        return res.contentType(mimetype).send(value).end()
+      }
       const value = await redisClient.get(key)
       res.json({ value })
     } catch (ex: any) {
@@ -203,6 +212,37 @@ router.post('/eval',
       }
       const result = await runVMScript(script, !!useEthers, timeoutParsed)
       res.json({ result })
+    } catch (ex: any) {
+      console.error(ex)
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: ex.toString() })
+    }
+  })
+
+const storage = multer.memoryStorage()
+const upload = multer({ limits: { fileSize: 1024 * 1024 * 2 }, storage })
+router.post('/upload',
+  limiter(),
+  authed,
+  upload.single('file'),
+  async (req, res) => {
+    const { key } = req.body
+    if (!key) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ error: 'need key in body', key })
+    }
+    if (!key.endsWith(':file')) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ error: 'key must ends with :file', key })
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/dot-notation
+      const f = req?.file
+      if (!f) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ error: 'missing file in body' })
+      }
+      const { mimetype, originalname, size } = f
+      console.log('[/upload]', { key, mimetype, originalname, size })
+      const response = await redisClient.set(key, Buffer.from(f.buffer))
+      const r2 = await redisClient.set(`${key}:mimetype`, mimetype)
+      res.json({ response, mimetype, originalname, size })
     } catch (ex: any) {
       console.error(ex)
       res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: ex.toString() })
