@@ -9,7 +9,7 @@ import { VM } from 'vm2'
 import lodash from 'lodash-es'
 // import { ethers } from 'ethers'
 import crypto from 'crypto'
-import multer, { Multer } from 'multer'
+import multer from 'multer'
 
 const router = express.Router()
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -36,7 +36,7 @@ const authed = (req: Request, res: Response, next: NextFunction): void => {
 
 router.get('/basic',
   limiter(),
-  authed,
+  // authed,
   async (req, res) => {
     const key = req.query.key as string | undefined
     if (!key) {
