@@ -136,8 +136,8 @@ router.get('/get',
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         return res.status(StatusCodes.BAD_REQUEST).json({ error: 'malformed url', url })
       }
-      const { data, status, statusText } = await base.get(url, { validateStatus: () => true })
-      res.json({ data, status, statusText })
+      const { data, status, statusText, headers } = await base.get(url, { validateStatus: () => true })
+      res.json({ data, status, statusText, headers })
     } catch (ex: any) {
       console.error(ex)
       res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: ex.toString() })
@@ -158,8 +158,8 @@ router.post('/url',
       if (!SUPPORTED_METHODS.includes(method)) {
         return res.status(StatusCodes.BAD_REQUEST).json({ error: 'method not supported', method })
       }
-      const { data, status, statusText } = await base({ url, method, data: body, headers, validateStatus: () => true })
-      res.json({ data, status, statusText })
+      const { data, status, statusText, headers: responseHeaders } = await base({ url, method, data: body, headers, validateStatus: () => true })
+      res.json({ data, status, statusText, headers: responseHeaders })
     } catch (ex: any) {
       console.error(ex)
       res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: ex.toString() })
