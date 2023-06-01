@@ -166,7 +166,7 @@ router.post('/url',
     }
   })
 
-async function runVMScript (script: string, useEthers: boolean = false, timeout: number = 5000): Promise<any> {
+async function runVMScript (script: string, useEthers: boolean = false, timeout: number = 30000): Promise<any> {
   let ethers = {}
   if (useEthers) {
     const { default: e } = await import('ethers')
