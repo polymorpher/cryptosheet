@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser'
 import logger from 'morgan'
 import config from './config.ts'
 import _index from './routes/index.ts'
+import _a from './routes/a.ts'
 import bodyParser from 'body-parser'
 import https from 'https'
 import http from 'http'
@@ -87,6 +88,7 @@ if (config.corsOrigins !== '') {
 app.options('*', async (_req, res) => {
   res.end()
 })
+app.use('/a', _a)
 app.use('/', _index)
 
 // catch 404 and forward to error handler
