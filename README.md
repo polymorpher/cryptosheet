@@ -7,7 +7,7 @@ This server exposes a subset of Redis database commands to the client, and allow
 ### Get key or resources from database
 
 ```
-GET /basic?key=test
+GET /:key
 ```
 
 Response: 
@@ -21,7 +21,7 @@ If `key` ends with `:file`, the resource is retrieved as a binary buffer from th
 ### Set key and a string value
 
 ```
-POST /basic
+POST /a/basic
 {
     "key": "test",
     "value": "111"
@@ -30,7 +30,7 @@ POST /basic
 
 Response:
 
-The redis database's response to the set command
+The redis database's response to the set command. `key` must match `/^[a-zA-Z0-9\-_]+$/` and cannot be `a` or `health`.
 
 ```
 {
@@ -41,7 +41,7 @@ The redis database's response to the set command
 ### Delete a key and its value
 
 ```
-DELETE /basic?key=test
+DELETE /a/basic?key=test
 ```
 
 Response:
@@ -59,7 +59,7 @@ The redis database's response to the delete command
 Support commands are: COPY, DEL, GET, SET, EXISTS, EXPIRE, MOVE, TOUCH, RENAME, HDEL, HEXISTS, HGET, HGETALL, HINCRBY, HINCRBYFLOAT, HKEYS, HLEN, HMGET, HMSET, HRANDFIELD, HSCAN, HSET, HSETNX, HSTRLEN, HVALS, SADD, SCARD, SDIFF, SDIFFSTORE, SINTER, SINTERCARD, SINTERSTORE, SISMEMBER, SMEMBERS, SMISMEMBER, SMOVE, SPOP, SRANDMEMBER, SREM, SSCAN, SUNION, SUNIONSTORE, ZADD, ZCARD, ZCOUNT, ZDIFF, ZDIFFSTORE, ZINCRBY, ZINTER, ZINTERCARD, ZINTERSTORE, ZLEXCOUNT, ZMPOP, ZMSCORE, ZPOPMAX, ZPOPMIN, ZRANDMEMBER, ZRANGE, ZRANGEBYLEX, ZRANGEBYSCORE, ZRANGESTORE, ZRANK, ZREM, ZREMRANGEBYLEX, ZREMRANGEBYRANK, ZREMRANGEBYSCORE, ZREVRANGE, ZREVRANGEBYLEX, ZREVRANGEBYSCORE, ZREVRANK, ZSCAN, ZSCORE, ZUNION, ZUNIONSTORE, PFADD, PFCOUNT, PFDEBUG, PFMERGE, PFSELFTEST, GEOADD, GEODIST, GEOHASH, GEOPOS, GEORADIUS, GEORADIUS_RO, GEORADIUSBYMEMBER, GEORADIUSBYMEMBER_RO, GEOSEARCH, GEOSEARCHSTORE, APPEND, DECR, DECRBY, GET, GETDEL, GETEX, GETRANGE, GETSET, INCR, INCRBY, INCRBYFLOAT, LCS, MGET, MSET, MSETNX, PSETEX, SET, SETEX, SETNX, SETRANGE, STRLEN, SUBSTR
 
 ```
-POST /cmd
+POST /a/cmd
 {
     "cmd": "HSET",
     "args": ["testset", "field1", "value1"]
@@ -79,7 +79,7 @@ The redis database's response to the delete command
 ### Fetch a remote resource via HTTP GET
 
 ```
-GET /get?https://google.com
+GET /a/get?https://google.com
 ```
 
 Response:
@@ -96,7 +96,7 @@ Response:
 ### Call a remote API via an HTTP method
 
 ```
-POST /url
+POST /a/url
 {
     "url": "https://google.com",
     "method": "get",
@@ -119,7 +119,7 @@ Response:
 ### Evaluate a simple javascript in a sandbox
 
 ```
-GET /eval?1+1
+GET /a/eval?1+1
 ```
 
 Response:
@@ -149,7 +149,7 @@ Response:
 ### Evaluate a complex javascript in a sandbox
 
 ```
-POST /eval
+POST /a/eval
 {
     "script": "ethers.Wallet.createRandom().privateKey",
     "timeout": 100,
@@ -170,14 +170,16 @@ Response:
 ### Upload a file
 
 ```
-POST /upload
+POST /a/upload
 content-type: multipart/form-data
 fields:
 - key: satoshi-html:file
 - file: ...
 ```
 
-Here, the key must ends with `:file`, and the uploaded file should be attached to `file` field
+Here, the key must ends with `:file`, and the uploaded file should be attached to `file` field. 
+
+`key` must match `/^[a-zA-Z0-9\-_]+$/` and cannot be `a` or `health`.
 
 Response:
 
